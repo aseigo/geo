@@ -229,4 +229,47 @@ defmodule Geo.Utils do
   def do_type_to_hex(%Geo.GeometryCollection{}) do
     0x07
   end
+
+  defp create_string_chars_impl(module, serializers) when is_map(serializers) do
+    default_serializer = Map.get(serializers, :default, &Geo.WKT.encode!/1)
+
+    case Map.get(serializers, module, default_serializer) do
+      serializer when is_function(serializer, 1) ->
+        IO.inspect(serializer, label: "Serializer")
+        quote do
+          defimpl String.Chars, for: unquote(module) do
+            def to_string(geo) do
+              unquote(serializer).(geo)
+            end
+          end
+        end
+
+      _ ->
+        IO.puts("SKip!")
+        :ok
+    end
+  end
+
+  defp create_string_chars_impl(_module, _serializers), do: IO.puts("SKip!"); :ok
+
+  defmacro create_string_chars_impls(_env) do
+    serializers = Application.get_env(:geo, :string_chars_impls, %{})
+
+    for module <- [
+      Geo.Point,
+      Geo.PointZ,
+      Geo.PointM,
+      Geo.PointZM,
+      Geo.LineString,
+      Geo.LineStringZ,
+      Geo.Polygon,
+      Geo.PolygonZ,
+      Geo.MultiPoint,
+      Geo.MultiLineString,
+      Geo.MultiLineStringZ,
+      Geo.MultiPolygon,
+      Geo.MultiPolygonZ,
+      Geo.GeometryCollection
+    ], do: create_string_chars_impl(module, serializers)
+  end
 end

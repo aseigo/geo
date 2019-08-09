@@ -65,6 +65,44 @@ defmodule Geo do
     iex(3)> Geo.JSON.encode(point) |> Poison.encode!
     "{\"type\":\"Point\",\"coordinates\":[100.0,0.0]}"
     ```
+
+  ## String.Chars type serialization
+
+  By default, the geometry types implement the String.Chars protocol for easy serialization
+  using Geo.WKT.encode!/1 to do the serialization to string.
+
+  This can be easily overriden in configuration, however, with a string_chars_impls entry
+  in the geo app's configuration. For instance, to prevent all String.Chars ipmlementations
+  put the following in the relevant config.exs for your application:
+
+    ```elixir
+    config :geo,
+      string_chars_impls: false
+    ```
+
+  To override just the implementation for Geo.Polygon (or any other type) do the following:
+
+    ```elixir
+    config: geo
+      string_chars_impls: %{Geo.Polygon => &MyModule.function/1}
+    ```
+
+  The default serializer may also be overriden:
+
+    ```elixir
+    config :geo,
+      string_chars_impls: %{:default => &MyMod.foo/1}
+    ```
+
+  And, of course, the approaches may be combined:
+
+    ```elixir
+    config :geo,
+      string_chars_impls: %{:default => &MyMod.foo/1,
+                            Geo.Polygon => &String.length/1}
+    ```
+
+  Serializer functions must accept one argument, the geometry data, and return a string.
   """
 
   @type geometry ::
@@ -85,25 +123,6 @@ defmodule Geo do
 
   @type endian :: :ndr | :xdr
 
-  defimpl String.Chars,
-    for: [
-      Geo.Point,
-      Geo.PointZ,
-      Geo.PointM,
-      Geo.PointZM,
-      Geo.LineString,
-      Geo.LineStringZ,
-      Geo.Polygon,
-      Geo.PolygonZ,
-      Geo.MultiPoint,
-      Geo.MultiLineString,
-      Geo.MultiLineStringZ,
-      Geo.MultiPolygon,
-      Geo.MultiPolygonZ,
-      Geo.GeometryCollection
-    ] do
-    def to_string(geo) do
-      Geo.WKT.encode!(geo)
-    end
-  end
+  require Geo.Utils
+  @before_compile {Geo.Utils, :create_string_chars_impls}
 end
